@@ -163,6 +163,12 @@
   .lob-swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; }
   .lob-row .num-field { margin-top: 4px; }
   .lob-row .num-field:first-of-type { margin-top: 0; }
+  .lob-row.selectable { cursor: pointer; transition: border-color 0.12s, background 0.12s; }
+  .lob-row.selectable:hover { border-color: var(--teal); }
+  .lob-row.selectable.selected { border-color: var(--teal); background: var(--teal-tint); }
+  .lob-row.selectable .lob-name { justify-content: space-between; }
+  .lob-row.selectable .lob-name .check { color: var(--teal); font-weight: 700; visibility: hidden; }
+  .lob-row.selectable.selected .lob-name .check { visibility: visible; }
 
   .foot-note { font-size: 11px; color: var(--ink-3); line-height: 1.6; border-top: 1px dashed var(--border); padding-top: 12px; margin-top: 4px; }
 
@@ -507,24 +513,6 @@
           <span class="hint" style="margin-left:4px;">Not sure which? Ask whoever gave you this code.</span>
         </div>
       </div>
-      <div class="key-banner" id="vehicleBanner" style="display:none;">
-        <div class="key-banner-text">
-          <strong>Google truck routing needs your vehicle's dimensions.</strong>
-          Saved only in this browser — survives future updates to this file, so you won't need to re-enter these
-          again after replacing it. (CONFIG values, if set there, still take priority over these.)
-        </div>
-        <div class="key-banner-row">
-          <input type="number" step="0.1" id="vehHeightInput" placeholder="Height (m)">
-          <input type="number" step="0.1" id="vehWidthInput" placeholder="Width (m)">
-          <input type="number" step="0.1" id="vehLengthInput" placeholder="Length (m)">
-          <input type="number" step="0.1" id="vehWeightInput" placeholder="Weight (tons)">
-          <input type="number" step="1" id="vehAxlesInput" placeholder="Axle count">
-        </div>
-        <div class="key-banner-row" style="margin-top:6px;">
-          <button type="button" id="vehicleBannerSave">Save truck specs</button>
-          <span id="vehicleBannerStatus" class="hint" style="margin-left:8px;"></span>
-        </div>
-      </div>
       <div class="basemap-toggle" id="basemapToggle">
         <button type="button" data-basemap="streets" class="active">Streets</button>
         <button type="button" data-basemap="imagery">Imagery + Labels</button>
@@ -582,14 +570,27 @@
     ],
 
     // Truck sizes: id, display label, load size (tons hauled per trip —
-    // independent of line of business), and maxDriveTimeByLob: the one-way
+    // independent of line of business), maxDriveTimeByLob: the one-way
     // drive-time cap (minutes) for THIS truck size running EACH line of
-    // business. So "3 Ton, Residential" and "10 Ton, Residential" can (and
-    // here do) have different caps, not just different disposal cost.
+    // business (so "3 Ton, Residential" and "10 Ton, Residential" can, and
+    // here do, have different caps, not just different disposal cost) —
+    // and each truck's OWN real vehicle dimensions for both providers,
+    // since a 3 Ton rig and a 10 Ton rig are genuinely different vehicles
+    // for routing purposes, not the same restrictions at different costs.
+    // Whichever truck is selected in the sidebar (before clicking the map)
+    // is the one whose googleVehicle/orsVehicle gets sent on that request.
+    // Either sub-object can be null if that truck doesn't need it (e.g.
+    // orsVehicle: null if this deployment doesn't use ORS at all).
     truckSizes: [
-      {id:"T3",  label:"3 Ton",  tons:3,  maxDriveTimeByLob:{COM:55, RES:50, REC:65}},
-      {id:"T5",  label:"5 Ton",  tons:5,  maxDriveTimeByLob:{COM:50, RES:45, REC:60}},
-      {id:"T10", label:"10 Ton", tons:10, maxDriveTimeByLob:{COM:40, RES:35, REC:50}}
+      {id:"T3",  label:"3 Ton",  tons:3,  maxDriveTimeByLob:{COM:55, RES:50, REC:65},
+        googleVehicle: {height:3.0, width:2.3, length:7.0, weight:3.0, axleCount:2},
+        orsVehicle: {weight:3.0, height:3.0, width:2.3, length:7.0, axleload:3.0}},
+      {id:"T5",  label:"5 Ton",  tons:5,  maxDriveTimeByLob:{COM:50, RES:45, REC:60},
+        googleVehicle: {height:3.3, width:2.4, length:8.5, weight:5.0, axleCount:2},
+        orsVehicle: {weight:5.0, height:3.3, width:2.4, length:8.5, axleload:5.0}},
+      {id:"T10", label:"10 Ton", tons:10, maxDriveTimeByLob:{COM:40, RES:35, REC:50},
+        googleVehicle: {height:3.6, width:2.5, length:10.5, weight:10.0, axleCount:3},
+        orsVehicle: {weight:10.0, height:3.6, width:2.5, length:10.5, axleload:10.0}}
     ],
 
     // Depot / yard trucks return to. Used only when the return trip is
@@ -668,31 +669,27 @@
     // API does. So these do NOT change which site ranks cheapest or how
     // far a service-area boundary extends; they only affect the ONE drawn
     // route line to the selected site, which IS fetched via Directions.
-    // Leave orsVehicleType empty/restrictions null to skip this entirely.
-    orsVehicleType: "goods",     // "hgv" | "bus" | "agricultural" | "delivery" | "forestry" | "goods" | ""
-    orsHgvWeight: null,          // gross vehicle weight, in tons
-    orsHgvHeight: null,          // meters
-    orsHgvWidth: null,           // meters
-    orsHgvLength: null,          // meters
-    orsHgvAxleload: null,        // tons
+    // vehicleType/hazmat apply to the whole fleet regardless of which
+    // truck is picked; the actual weight/height/width/length/axleload
+    // restrictions are set PER TRUCK SIZE instead (see truckSizes above,
+    // each entry's orsVehicle) — a 3 Ton and a 10 Ton rig are genuinely
+    // different vehicles, not the same restrictions at different costs.
+    // Leave orsVehicleType empty to skip HGV restrictions entirely.
+    orsVehicleType: "hgv",     // "hgv" | "bus" | "agricultural" | "delivery" | "forestry" | "goods" | ""
     orsHgvHazmat: false,
 
     // Google Routes API (Large Vehicle Routing) settings — only used when
     // routingProvider is "google". Get an API key at console.cloud.google.com
     // and separately request LVR access (see note above CONFIG.routingProvider).
     // Unlike ORS's HGV restrictions (soft preference for the matrix, real
-    // for the route line only), ALL FOUR of height/width/weight/length below
-    // are REQUIRED by Google whenever travelMode is TRUCK — and here they
-    // apply everywhere (cost table, depot legs, service areas, AND the
-    // drawn route line), not just the route line like ORS.
+    // for the route line only), Google's height/width/weight/length are
+    // REQUIRED whenever travelMode is TRUCK, and apply everywhere (cost
+    // table, depot legs, service areas, AND the drawn route line) — set
+    // PER TRUCK SIZE (see truckSizes above, each entry's googleVehicle),
+    // not here, since a 3 Ton and a 10 Ton rig need different values.
     googleApiKey: "",
     googleBaseUrl: "http://localhost:8765/proxy/google",   // via local_server_with_proxy.py — see the CORS note on orsBaseUrl above; the same real-server CORS block is likely here too, unconfirmed either way
-    googleVehicleHeight: 3.5,     // meters — REQUIRED
-    googleVehicleWidth: 2.5,      // meters — REQUIRED
-    googleVehicleLength: 12.0,    // meters (combined vehicle + trailer) — REQUIRED
-    googleVehicleWeight: 15.0,    // tons, loaded — REQUIRED
-    googleVehicleAxleCount: 3,    // integer — REQUIRED
-    googleVehicleTrailerLength: null,     // meters, optional
+    googleVehicleTrailerLength: null,     // meters, optional — applies regardless of truck size
     googleVehicleHazardousGoodsTypes: [], // e.g. ["FLAMMABLE"] — optional, see Google's docs for valid values
     // Milliseconds between each Google request when several are needed in
     // one go (e.g. computing all 5 sites' service areas). Google's request-
@@ -961,57 +958,31 @@
   }
 
   // ---------- Google Routes API (Large Vehicle Routing) ----------
-  var GOOGLE_VEHICLE_STORAGE = "haulRouterGoogleVehicle";
-  function getSavedVehicleInfo() {
-    try {
-      var raw = localStorage.getItem(GOOGLE_VEHICLE_STORAGE);
-      return raw ? JSON.parse(raw) : {};
-    } catch (e) { return {}; }
-  }
-  function setSavedVehicleInfo(obj) {
-    try { localStorage.setItem(GOOGLE_VEHICLE_STORAGE, JSON.stringify(obj)); } catch (e) { /* private browsing etc. */ }
-  }
-  // CONFIG value wins if set there; otherwise falls back to whatever's
-  // saved in this browser from the vehicle-specs banner below — same
-  // priority pattern as the API key, and for the same reason: CONFIG gets
-  // reset to blank defaults every time this file itself gets updated/
-  // replaced, but a real truck's dimensions don't change nearly that
-  // often, so they're worth persisting separately from the file.
-  function effectiveVehicleField(configVal, savedKey) {
-    if (configVal != null) return configVal;
-    var v = getSavedVehicleInfo()[savedKey];
-    return v != null ? v : null;
+  // Looks up whichever truck is currently selected in the sidebar (see
+  // activeTruckId below) rather than relying on a variable that might not
+  // be assigned yet depending on call order -- safe to call from anywhere.
+  function getActiveTruck() {
+    return truckSizes.find(function (t) { return t.id === activeTruckId; }) || truckSizes[0];
   }
   function googleVehicleInfoComplete() {
-    return effectiveVehicleField(CONFIG.googleVehicleHeight, "height") != null &&
-      effectiveVehicleField(CONFIG.googleVehicleWidth, "width") != null &&
-      effectiveVehicleField(CONFIG.googleVehicleWeight, "weight") != null &&
-      effectiveVehicleField(CONFIG.googleVehicleLength, "length") != null &&
-      effectiveVehicleField(CONFIG.googleVehicleAxleCount, "axleCount") != null;
+    var gv = getActiveTruck().googleVehicle;
+    return gv != null && gv.height != null && gv.width != null && gv.weight != null &&
+      gv.length != null && gv.axleCount != null;
   }
   function buildGoogleVehicleInfo() {
-    var height = effectiveVehicleField(CONFIG.googleVehicleHeight, "height");
-    var width = effectiveVehicleField(CONFIG.googleVehicleWidth, "width");
-    var weight = effectiveVehicleField(CONFIG.googleVehicleWeight, "weight");
-    var length = effectiveVehicleField(CONFIG.googleVehicleLength, "length");
-    var axleCount = effectiveVehicleField(CONFIG.googleVehicleAxleCount, "axleCount");
-    var trailerLength = effectiveVehicleField(CONFIG.googleVehicleTrailerLength, "trailerLength");
-    var hazmatTypes = (CONFIG.googleVehicleHazardousGoodsTypes && CONFIG.googleVehicleHazardousGoodsTypes.length)
-      ? CONFIG.googleVehicleHazardousGoodsTypes
-      : (getSavedVehicleInfo().hazmatTypes || []);
-
+    var gv = getActiveTruck().googleVehicle;
     var vi = {
-      totalHeightMm: Math.round(height * 1000),
-      totalWidthMm: Math.round(width * 1000),
-      totalWeightKg: Math.round(weight * 1000),
-      totalLengthMm: Math.round(length * 1000),
-      totalAxleCount: axleCount
+      totalHeightMm: Math.round(gv.height * 1000),
+      totalWidthMm: Math.round(gv.width * 1000),
+      totalWeightKg: Math.round(gv.weight * 1000),
+      totalLengthMm: Math.round(gv.length * 1000),
+      totalAxleCount: gv.axleCount
     };
-    if (trailerLength != null) {
-      vi.trailerInfo = [{ lengthMm: Math.round(trailerLength * 1000) }];
+    if (CONFIG.googleVehicleTrailerLength != null) {
+      vi.trailerInfo = [{ lengthMm: Math.round(CONFIG.googleVehicleTrailerLength * 1000) }];
     }
-    if (hazmatTypes.length) {
-      vi.hazardousGoodsTypes = hazmatTypes;
+    if (CONFIG.googleVehicleHazardousGoodsTypes && CONFIG.googleVehicleHazardousGoodsTypes.length) {
+      vi.hazardousGoodsTypes = CONFIG.googleVehicleHazardousGoodsTypes;
     }
     return vi;
   }
@@ -1288,37 +1259,6 @@
       } catch (e) { /* private browsing etc. */ }
       accessCodeBanner.style.display = "block";
     });
-  }
-
-  // ---------- vehicle-specs banner (Google only) ----------
-  var vehicleBanner = document.getElementById("vehicleBanner");
-  document.getElementById("vehicleBannerSave").addEventListener("click", function () {
-    var height = parseFloat(document.getElementById("vehHeightInput").value);
-    var width = parseFloat(document.getElementById("vehWidthInput").value);
-    var length = parseFloat(document.getElementById("vehLengthInput").value);
-    var weight = parseFloat(document.getElementById("vehWeightInput").value);
-    var axleCount = parseInt(document.getElementById("vehAxlesInput").value, 10);
-    if ([height, width, length, weight, axleCount].some(function (v) { return isNaN(v); })) {
-      document.getElementById("vehicleBannerStatus").textContent = "All five fields are required.";
-      return;
-    }
-    var saved = getSavedVehicleInfo();
-    saved.height = height; saved.width = width; saved.length = length;
-    saved.weight = weight; saved.axleCount = axleCount;
-    setSavedVehicleInfo(saved);
-    vehicleBanner.style.display = "none";
-    if (currentPopup) {
-      handleClick(currentPopup.lat, currentPopup.lng, { x: currentPopup.x, y: currentPopup.y });
-    }
-  });
-  if (CONFIG.routingProvider === "google" && !googleVehicleInfoComplete()) {
-    var saved = getSavedVehicleInfo();
-    if (saved.height != null) document.getElementById("vehHeightInput").value = saved.height;
-    if (saved.width != null) document.getElementById("vehWidthInput").value = saved.width;
-    if (saved.length != null) document.getElementById("vehLengthInput").value = saved.length;
-    if (saved.weight != null) document.getElementById("vehWeightInput").value = saved.weight;
-    if (saved.axleCount != null) document.getElementById("vehAxlesInput").value = saved.axleCount;
-    vehicleBanner.style.display = "block";
   }
 
   // ---------- map ----------
@@ -2008,13 +1948,16 @@
     // with a "no routable point found" error. -1 per coordinate means
     // "search as far as needed," removing that limit entirely.
     var body = { coordinates: [fromLngLat, toLngLat], radiuses: [-1, -1] };
-    if (CONFIG.orsProfile === "driving-hgv" && (CONFIG.orsVehicleType || CONFIG.orsHgvWeight || CONFIG.orsHgvHeight)) {
+    var ov = getActiveTruck().orsVehicle;
+    if (CONFIG.orsProfile === "driving-hgv" && (CONFIG.orsVehicleType || ov)) {
       var restrictions = {};
-      if (CONFIG.orsHgvWeight != null) restrictions.weight = CONFIG.orsHgvWeight;
-      if (CONFIG.orsHgvHeight != null) restrictions.height = CONFIG.orsHgvHeight;
-      if (CONFIG.orsHgvWidth != null) restrictions.width = CONFIG.orsHgvWidth;
-      if (CONFIG.orsHgvLength != null) restrictions.length = CONFIG.orsHgvLength;
-      if (CONFIG.orsHgvAxleload != null) restrictions.axleload = CONFIG.orsHgvAxleload;
+      if (ov) {
+        if (ov.weight != null) restrictions.weight = ov.weight;
+        if (ov.height != null) restrictions.height = ov.height;
+        if (ov.width != null) restrictions.width = ov.width;
+        if (ov.length != null) restrictions.length = ov.length;
+        if (ov.axleload != null) restrictions.axleload = ov.axleload;
+      }
       if (CONFIG.orsHgvHazmat) restrictions.hazmat = true;
       var options = {};
       if (CONFIG.orsVehicleType) options.vehicle_type = CONFIG.orsVehicleType;
@@ -2293,6 +2236,7 @@
       btn.addEventListener("click", function () {
         activeTruckId = btn.dataset.truck;
         paintPopupBody();
+        renderTruckList(); // keep the sidebar's own selection in sync
       });
     });
   }
@@ -2424,24 +2368,45 @@
     });
   }
 
-  // ---------- sidebar: truck sizes (read-only, from CONFIG) ----------
+  // ---------- sidebar: truck sizes (clickable selector) ----------
   // Max drive time is shown per line of business here since it's a
   // truck-size x line-of-business matrix, not a single number per truck.
+  // Selecting a row here sets activeTruckId BEFORE any map click happens --
+  // that's the whole point, since the cost table, live routing restrictions
+  // (Google's vehicleInfo, ORS's HGV restrictions), and this list all read
+  // from the SAME activeTruckId, whichever UI last set it (this list or
+  // the popup's own truck tabs after a click -- both stay in sync).
   function renderTruckList() {
     truckListEl.innerHTML = "";
     truckSizes.forEach(function (t) {
       var row = document.createElement("div");
-      row.className = "lob-row";
+      var isSelected = t.id === activeTruckId;
+      row.className = "lob-row selectable" + (isSelected ? " selected" : "");
+      row.setAttribute("role", "button");
+      row.setAttribute("tabindex", "0");
+      row.setAttribute("aria-pressed", isSelected ? "true" : "false");
       var maxDriveRows = lobs.map(function (l) {
         var md = getMaxDriveTime(l.id, t.id);
         return '<div class="num-field"><span>Max drive — ' + escapeHtml(l.label) + '</span><span class="kv-value">' + (isFinite(md) ? md + ' min' : '—') + '</span></div>';
       }).join("");
       row.innerHTML =
-        '<div class="lob-name">' + escapeHtml(t.label) + '</div>' +
+        '<div class="lob-name">' + escapeHtml(t.label) + '<span class="check">✓ selected</span></div>' +
         '<div class="num-field"><span>Load</span><span class="kv-value">' + t.tons + ' t</span></div>' +
         maxDriveRows;
+      row.addEventListener("click", function () { selectTruck(t.id); });
+      row.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectTruck(t.id); }
+      });
       truckListEl.appendChild(row);
     });
+  }
+  function selectTruck(truckId) {
+    if (truckId === activeTruckId) return;
+    activeTruckId = truckId;
+    renderTruckList();
+    // Keep an already-open popup's own truck tabs in sync, so the two
+    // controls never show conflicting selections.
+    if (currentPopup) paintPopupBody();
   }
 
   // ---------- sidebar: depot (read-only, from CONFIG) ----------
