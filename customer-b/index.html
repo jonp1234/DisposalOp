@@ -519,14 +519,18 @@
         <button type="button" data-basemap="imagery">Imagery + Labels</button>
         <button type="button" data-basemap="gray">Light Gray Canvas</button>
       </div>
-      <button type="button" class="ghost" id="measureToggleBtn" style="position:absolute; top:14px; left:14px; z-index:500;">📏 Measure</button>
-      <div id="measurePanel" style="display:none; position:absolute; top:14px; left:14px; z-index:500; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px; box-shadow:var(--shadow); font-size:12.5px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <span>Click points on the map to measure. Total: <strong id="measureTotal" style="font-family:var(--font-mono);">0.0 mi</strong></span>
+      <button type="button" class="ghost" id="measureToggleBtn" style="position:absolute; top:58px; right:14px; z-index:500;">📏 Measure</button>
+      <div id="measurePanel" style="display:none; position:absolute; top:58px; right:14px; z-index:500; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px; box-shadow:var(--shadow); font-size:12.5px; max-width:min(320px, calc(100vw - 28px));">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span>Total: <strong id="measureTotal" style="font-family:var(--font-mono);">0.0 mi</strong></span>
+          <span class="size-seg" id="measureUnitSeg" style="display:inline-flex; padding:2px; margin:0;">
+            <button type="button" data-unit="mi" class="active" style="padding:4px 9px; font-size:11px;">Mi</button>
+            <button type="button" data-unit="km" style="padding:4px 9px; font-size:11px;">Km</button>
+          </span>
           <button type="button" class="ghost" id="measureClearBtn" style="padding:4px 10px; font-size:11.5px;">Clear</button>
           <button type="button" class="ghost" id="measureDoneBtn" style="padding:4px 10px; font-size:11.5px;">Done</button>
         </div>
-        <p class="hint" style="margin:6px 0 0; font-size:11px;">Straight-line distance between points, not a driving route.</p>
+        <p class="hint" style="margin:6px 0 0; font-size:11px;">Click points on the map to measure. Straight-line distance, not a driving route.</p>
       </div>
     </main>
   </div>
@@ -561,11 +565,11 @@
     // generated points for hand-drawn [lat,lng] coordinates in
     // drawServiceAreas if you have a real GIS boundary.
     sites: [
-      {id:"A", name:"Site A — North County",       lat:50.6404, lng:-104.8656, costPerTon:32.00, turnaroundMin:20, serviceArea:{radiusMi:18, color:"#c97f19"}},
-      {id:"B", name:"Site B — East Valley Regional", lat:50.5167, lng:-104.2167, costPerTon:28.50, turnaroundMin:22, serviceArea:{radiusMi:17, color:"#4c6ef5"}},
-      {id:"C", name:"Site C — South Regional",      lat:49.9833, lng:-104.4667, costPerTon:30.75, turnaroundMin:16, serviceArea:{radiusMi:32, color:"#e64980"}},
-      {id:"D", name:"Site D — West County",         lat:50.3833, lng:-105.1500, costPerTon:35.00, turnaroundMin:28, serviceArea:{radiusMi:24, color:"#37b24d"}},
-      {id:"E", name:"Site E — Northeast Transfer",  lat:50.7719, lng:-103.9017, costPerTon:27.25, turnaroundMin:19, serviceArea:{radiusMi:34, color:"#7048e8"}}
+      {id:"A", name:"Site A — North County",       lat:40.708922, lng:-79.740057, costPerTon:32.00, turnaroundMin:20, serviceArea:{radiusMi:18, color:"#c97f19"}},
+      {id:"B", name:"Site B — East Valley Regional", lat:40.387613, lng:-79.808834, costPerTon:28.50, turnaroundMin:22, serviceArea:{radiusMi:17, color:"#4c6ef5"}},
+      {id:"C", name:"Site C — South Regional",      lat:40.448703, lng:-80.206216, costPerTon:30.75, turnaroundMin:16, serviceArea:{radiusMi:32, color:"#e64980"}},
+      {id:"D", name:"Site D — West County",         lat:40.685747, lng:-80.119607, costPerTon:35.00, turnaroundMin:28, serviceArea:{radiusMi:24, color:"#37b24d"}},
+      {id:"E", name:"Site E — Northeast Transfer",  lat:40.291503, lng:-80.083945, costPerTon:27.25, turnaroundMin:19, serviceArea:{radiusMi:34, color:"#7048e8"}}
     ],
 
     // Lines of business: id, display label, labor rate for that crew, and
@@ -606,7 +610,7 @@
     // Depot / yard trucks return to. Used only when the return trip is
     // costed — the return leg is the real routed distance from whichever
     // site was picked back to this point, not just the outbound leg reversed.
-    depot: { name: "Central Depot", lat: 50.469199, lng: -104.581248 },
+    depot: { name: "Central Depot", lat: 40.442887, lng: -79.997336 },
 
     // Which routing engine to use for all live routing calls (cost table,
     // depot legs, service-area isochrones, and the drawn route line).
@@ -648,7 +652,7 @@
     // back at "https://router.project-osrm.org" to use the public demo
     // server instead (fine for light testing, not for real use — it's
     // rate-limited and its terms forbid production/commercial traffic).
-    osrmBaseUrl: "https://disposalop.onrender.com/proxy/ors",
+    osrmBaseUrl: "http://localhost:5000",
 
     // OpenRouteService settings — only used when routingProvider is "ors".
     // Get a free key at https://openrouteservice.org/dev/#/signup
@@ -670,7 +674,7 @@
     // relays ORS calls server-side, where CORS doesn't apply. Your API
     // key still flows through untouched to ORS either way — the proxy
     // never sees, stores, or replaces it.
-    orsApiKey: "",
+    orsApiKey: "https://disposalop.onrender.com/proxy/ors",
     orsBaseUrl: "http://localhost:8765/proxy/ors",   // via local_server_with_proxy.py — see note above
     orsProfile: "driving-hgv",   // "driving-hgv" for trucks, "driving-car" for a regular car profile
     // HGV vehicle restrictions — IMPORTANT: ORS's Matrix API (used for the
@@ -698,7 +702,7 @@
     // PER TRUCK SIZE (see truckSizes above, each entry's googleVehicle),
     // not here, since a 3 Ton and a 10 Ton rig need different values.
     googleApiKey: "",
-    googleBaseUrl: "https://disposalop.onrender.com/proxy/google",   // via local_server_with_proxy.py — see the CORS note on orsBaseUrl above; the same real-server CORS block is likely here too, unconfirmed either way
+    googleBaseUrl: ""https://disposalop.onrender.com/proxy/google",   // via local_server_with_proxy.py — see the CORS note on orsBaseUrl above; the same real-server CORS block is likely here too, unconfirmed either way
     googleVehicleTrailerLength: null,     // meters, optional — applies regardless of truck size
     googleVehicleHazardousGoodsTypes: [], // e.g. ["FLAMMABLE"] — optional, see Google's docs for valid values
     // Milliseconds between each Google request when several are needed in
@@ -736,9 +740,13 @@
     // buttons on the map either way.
     defaultBasemap: "streets",
 
-    // Map starting position: [lat, lng], zoom level.
-    mapCenter: [50.45, -104.55],
-    mapZoom: 9
+    // Map starting view. By default (mapExtent left null), this
+    // automatically fits to show every site + the depot, with some
+    // padding -- self-maintaining, so it doesn't need updating whenever
+    // sites are added, removed, or moved. To pin an exact fixed view
+    // instead, set mapExtent to [xmin, ymin, xmax, ymax] (a lng/lat
+    // bounding box, xmin=west, ymin=south, xmax=east, ymax=north).
+    mapExtent: null,
   };
 
   // Cloud/multi-tenant deployments serve ONE file to every customer, but
@@ -1276,7 +1284,19 @@
   }
 
   // ---------- map ----------
-  var map = L.map("map", { zoomControl: true, attributionControl: true }).setView(CONFIG.mapCenter, CONFIG.mapZoom);
+  var map = L.map("map", { zoomControl: true, attributionControl: true });
+  (function () {
+    if (CONFIG.mapExtent) {
+      var e = CONFIG.mapExtent; // [xmin(west), ymin(south), xmax(east), ymax(north)]
+      map.fitBounds([[e[1], e[0]], [e[3], e[2]]], { padding: [40, 40] });
+    } else {
+      // maxZoom keeps a single site (or a tightly-clustered few) from
+      // zooming in uncomfortably close -- fitBounds would otherwise zoom
+      // all the way in for a near-zero-area bounding box.
+      var allPoints = sites.map(function (s) { return [s.lat, s.lng]; }).concat([[depot.lat, depot.lng]]);
+      map.fitBounds(L.latLngBounds(allPoints), { padding: [40, 40], maxZoom: 13 });
+    }
+  })();
 
   // Note: plain tile.openstreetmap.org actively blocks requests from most
   // embedded/app contexts per its usage policy, and CARTO's free basemap
@@ -1675,6 +1695,11 @@
   var measurePoints = []; // [[lat,lng], ...]
   var measureLayer = null;
   var measureMarkers = [];
+  // Starts matching the app-wide setting, but independently togglable via
+  // the Mi/Km buttons in the panel itself -- a quick unit check here
+  // shouldn't require changing CONFIG.distanceUnit (which affects the
+  // cost table, service areas, etc. too) and reloading the whole app.
+  var measureUnit = CONFIG.distanceUnit === "km" ? "km" : "mi";
   var measureToggleBtn = document.getElementById("measureToggleBtn");
   var measurePanel = document.getElementById("measurePanel");
   var measureTotalEl = document.getElementById("measureTotal");
@@ -1688,7 +1713,7 @@
   }
 
   function updateMeasureDisplay() {
-    measureTotalEl.textContent = formatDistanceMi(measureTotalMiles());
+    measureTotalEl.textContent = formatDistanceMi(measureTotalMiles(), measureUnit);
     if (measureLayer) { map.removeLayer(measureLayer); measureLayer = null; }
     if (measurePoints.length >= 2) {
       measureLayer = L.polyline(measurePoints, { color: "#e64980", weight: 3, dashArray: "6 4" }).addTo(map);
@@ -1716,12 +1741,26 @@
     measureModeActive = active;
     measureToggleBtn.classList.toggle("active", active);
     measurePanel.style.display = active ? "block" : "none";
-    if (!active) clearMeasurement();
+    if (active) updateMeasureDisplay(); // shows "0.0" in the correct starting unit immediately, not just after the first click
+    else clearMeasurement();
   }
 
   measureToggleBtn.addEventListener("click", function () { setMeasureMode(!measureModeActive); });
   document.getElementById("measureClearBtn").addEventListener("click", clearMeasurement);
   document.getElementById("measureDoneBtn").addEventListener("click", function () { setMeasureMode(false); });
+  document.querySelectorAll("#measureUnitSeg button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      measureUnit = btn.dataset.unit;
+      document.querySelectorAll("#measureUnitSeg button").forEach(function (b) {
+        b.classList.toggle("active", b === btn);
+      });
+      updateMeasureDisplay();
+    });
+    // Sync initial visual state with measureUnit's actual starting value --
+    // the HTML hardcodes "Mi" as active, which would be wrong to look at
+    // if CONFIG.distanceUnit is "km".
+    btn.classList.toggle("active", btn.dataset.unit === measureUnit);
+  });
 
   map.on("click", function (e) {
     if (measureModeActive) {
@@ -1941,9 +1980,13 @@
   // regardless (costPerMile, radiusMi, etc.), only display converts here.
   var MI_PER_KM = 0.621371;
   var KM_PER_MI = 1.609344;
-  function formatDistanceMi(mi) {
+  function formatDistanceMi(mi, unitOverride) {
     // 1 decimal -- for precise route/leg distances (e.g. "52.4 mi").
-    if (CONFIG.distanceUnit === "km") return (mi * KM_PER_MI).toFixed(1) + " km";
+    // unitOverride lets a caller show a specific unit regardless of the
+    // app-wide CONFIG.distanceUnit setting (used by the measure tool's own
+    // local Mi/Km toggle) -- omit it to just follow the global setting.
+    var unit = unitOverride || CONFIG.distanceUnit;
+    if (unit === "km") return (mi * KM_PER_MI).toFixed(1) + " km";
     return mi.toFixed(1) + " mi";
   }
   function formatRadiusMi(mi) {
