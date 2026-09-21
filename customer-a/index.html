@@ -99,6 +99,7 @@
   button.ghost:hover { border-color: var(--teal); color: var(--teal-strong); }
   button.ghost:focus-visible, .size-seg button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
   button.ghost:disabled { opacity: 0.6; cursor: default; }
+  button.ghost.active { background: var(--teal); color: #fff; border-color: var(--teal); }
   #sidebarToggle { display: none; }
 
   .search-box { position: relative; display: flex; align-items: center; gap: 6px; }
@@ -518,6 +519,15 @@
         <button type="button" data-basemap="imagery">Imagery + Labels</button>
         <button type="button" data-basemap="gray">Light Gray Canvas</button>
       </div>
+      <button type="button" class="ghost" id="measureToggleBtn" style="position:absolute; top:14px; left:14px; z-index:500;">📏 Measure</button>
+      <div id="measurePanel" style="display:none; position:absolute; top:14px; left:14px; z-index:500; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px; box-shadow:var(--shadow); font-size:12.5px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span>Click points on the map to measure. Total: <strong id="measureTotal" style="font-family:var(--font-mono);">0.0 mi</strong></span>
+          <button type="button" class="ghost" id="measureClearBtn" style="padding:4px 10px; font-size:11.5px;">Clear</button>
+          <button type="button" class="ghost" id="measureDoneBtn" style="padding:4px 10px; font-size:11.5px;">Done</button>
+        </div>
+        <p class="hint" style="margin:6px 0 0; font-size:11px;">Straight-line distance between points, not a driving route.</p>
+      </div>
     </main>
   </div>
 
@@ -638,7 +648,7 @@
     // back at "https://router.project-osrm.org" to use the public demo
     // server instead (fine for light testing, not for real use — it's
     // rate-limited and its terms forbid production/commercial traffic).
-    osrmBaseUrl: "http://localhost:5000",
+    osrmBaseUrl: "https://disposalop.onrender.com/proxy/ors",
 
     // OpenRouteService settings — only used when routingProvider is "ors".
     // Get a free key at https://openrouteservice.org/dev/#/signup
@@ -661,7 +671,7 @@
     // key still flows through untouched to ORS either way — the proxy
     // never sees, stores, or replaces it.
     orsApiKey: "",
-    orsBaseUrl: "https://disposalop.onrender.com/proxy/ors",   // via local_server_with_proxy.py — see note above
+    orsBaseUrl: "http://localhost:8765/proxy/ors",   // via local_server_with_proxy.py — see note above
     orsProfile: "driving-hgv",   // "driving-hgv" for trucks, "driving-car" for a regular car profile
     // HGV vehicle restrictions — IMPORTANT: ORS's Matrix API (used for the
     // cost table, depot legs, and service-area isochrones) does NOT
@@ -703,6 +713,10 @@
 
     // Shared cost assumptions (apply to every line of business).
     costPerMile: 3.25,   // transport cost, per mile driven
+    // Everything internally stays computed in miles (costPerMile, service
+    // area radiusMi, etc.) regardless of this setting -- it only controls
+    // how distances are DISPLAYED. "mi" or "km".
+    distanceUnit: "mi",
     roundTrip: false,    // true = cost the real drive back to the depot too (starting value; toggle in the sidebar overrides this per session)
 
     // Whether service-area boundaries are shown on load (starting value;
@@ -1321,7 +1335,7 @@
     });
   }
   setBasemap(CONFIG.defaultBasemap || "streets");
-  L.control.scale({ imperial: true, metric: false }).addTo(map);
+  L.control.scale(CONFIG.distanceUnit === "km" ? { imperial: false, metric: true } : { imperial: true, metric: false }).addTo(map);
 
   // Esri's and OpenStreetMap's free/keyless tile terms require attribution
   // to stay accessible, but a permanently-expanded credit line is a lot of
@@ -1652,7 +1666,68 @@
 
   recomputeServiceAreas();
 
+  // ---------- distance measurement tool ----------
+  // Straight-line (haversine) distance between clicked points, not a
+  // driving route -- reuses the same haversineMiles() already defined
+  // above for the fallback-estimate path. While active, map clicks go
+  // here instead of the normal cost-routing popup.
+  var measureModeActive = false;
+  var measurePoints = []; // [[lat,lng], ...]
+  var measureLayer = null;
+  var measureMarkers = [];
+  var measureToggleBtn = document.getElementById("measureToggleBtn");
+  var measurePanel = document.getElementById("measurePanel");
+  var measureTotalEl = document.getElementById("measureTotal");
+
+  function measureTotalMiles() {
+    var total = 0;
+    for (var i = 1; i < measurePoints.length; i++) {
+      total += haversineMiles(measurePoints[i - 1][0], measurePoints[i - 1][1], measurePoints[i][0], measurePoints[i][1]);
+    }
+    return total;
+  }
+
+  function updateMeasureDisplay() {
+    measureTotalEl.textContent = formatDistanceMi(measureTotalMiles());
+    if (measureLayer) { map.removeLayer(measureLayer); measureLayer = null; }
+    if (measurePoints.length >= 2) {
+      measureLayer = L.polyline(measurePoints, { color: "#e64980", weight: 3, dashArray: "6 4" }).addTo(map);
+    }
+  }
+
+  function addMeasurePoint(lat, lng) {
+    measurePoints.push([lat, lng]);
+    var marker = L.circleMarker([lat, lng], {
+      radius: 5, color: "#e64980", weight: 2, fillColor: "#fff", fillOpacity: 1
+    }).addTo(map);
+    measureMarkers.push(marker);
+    updateMeasureDisplay();
+  }
+
+  function clearMeasurement() {
+    measurePoints = [];
+    measureMarkers.forEach(function (m) { map.removeLayer(m); });
+    measureMarkers = [];
+    if (measureLayer) { map.removeLayer(measureLayer); measureLayer = null; }
+    updateMeasureDisplay();
+  }
+
+  function setMeasureMode(active) {
+    measureModeActive = active;
+    measureToggleBtn.classList.toggle("active", active);
+    measurePanel.style.display = active ? "block" : "none";
+    if (!active) clearMeasurement();
+  }
+
+  measureToggleBtn.addEventListener("click", function () { setMeasureMode(!measureModeActive); });
+  document.getElementById("measureClearBtn").addEventListener("click", clearMeasurement);
+  document.getElementById("measureDoneBtn").addEventListener("click", function () { setMeasureMode(false); });
+
   map.on("click", function (e) {
+    if (measureModeActive) {
+      addMeasurePoint(e.latlng.lat, e.latlng.lng);
+      return;
+    }
     handleClick(e.latlng.lat, e.latlng.lng, e.containerPoint);
   });
 
@@ -1861,12 +1936,42 @@
     "straight": "↑", "slight right": "↗", "right": "→", "sharp right": "↘",
     "roundabout": "⟲", "rotary": "⟲", "roundabout turn": "⟲"
   };
+  // Shared distance-unit formatting -- CONFIG.distanceUnit controls all of
+  // these; everything computed elsewhere stays in miles internally
+  // regardless (costPerMile, radiusMi, etc.), only display converts here.
+  var MI_PER_KM = 0.621371;
+  var KM_PER_MI = 1.609344;
+  function formatDistanceMi(mi) {
+    // 1 decimal -- for precise route/leg distances (e.g. "52.4 mi").
+    if (CONFIG.distanceUnit === "km") return (mi * KM_PER_MI).toFixed(1) + " km";
+    return mi.toFixed(1) + " mi";
+  }
+  function formatRadiusMi(mi) {
+    // Whole number -- for the rounder-looking service-area radius labels
+    // (e.g. "≤18 mi"), matching how those were already written by hand.
+    if (CONFIG.distanceUnit === "km") return "≤" + Math.round(mi * KM_PER_MI) + " km";
+    return "≤" + Math.round(mi) + " mi";
+  }
+  function formatCostPerMile(costPerMi) {
+    // A RATE, not a plain distance -- converts to the equivalent $/km
+    // rather than just relabeling the same number, so it stays a
+    // genuinely correct cost figure in either unit.
+    if (CONFIG.distanceUnit === "km") return "$" + (costPerMi / KM_PER_MI).toFixed(2) + "/km";
+    return "$" + costPerMi.toFixed(2) + "/mi";
+  }
+  function distanceUnitLabel() {
+    return CONFIG.distanceUnit === "km" ? "Km" : "Mi";
+  }
   function ordinal(n) {
     var s = ["th", "st", "nd", "rd"], v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   }
   function fmtStepDist(m) {
     if (!m) return "";
+    if (CONFIG.distanceUnit === "km") {
+      var km = m / 1000;
+      return km < 0.1 ? Math.round(m) + " m" : km.toFixed(1) + " km";
+    }
     var mi = m / 1609.344;
     return mi < 0.1 ? Math.round(mi * 5280) + " ft" : mi.toFixed(1) + " mi";
   }
@@ -2207,7 +2312,7 @@
       // max-drive-time cells compare against.
       return '<tr class="' + rowClass + '">' +
         '<td class="site-name">' + escapeHtml(s.name.split("—")[0].trim()) + badgeHtml + '</td>' +
-        '<td>' + topCost.mi.toFixed(1) + '</td>' +
+        '<td>' + (CONFIG.distanceUnit === "km" ? (topCost.mi * KM_PER_MI).toFixed(1) : topCost.mi.toFixed(1)) + '</td>' +
         '<td>' + Math.round(topCost.driveTimeMin) + '</td>' +
         tds +
         '</tr>';
@@ -2219,7 +2324,7 @@
       '<div class="size-seg" id="lobSeg">' + lobSeg + '</div>' +
       '<div class="size-seg" id="truckSeg">' + truckSeg + '</div>' +
       '<p class="hint" style="margin:0 0 4px; font-size:11px;">Max drive time depends on both line of business and truck size — see the cap under each column below. The solid line on the map traces the real driving route to the lowest-cost site below.</p>' +
-      '<div class="table-scroll"><table class="results"><thead><tr><th>Site</th><th>Mi</th><th>Min</th>' + thTrucks + '</tr></thead><tbody>' + trs + '</tbody></table></div>' +
+      '<div class="table-scroll"><table class="results"><thead><tr><th>Site</th><th>' + distanceUnitLabel() + '</th><th>Min</th>' + thTrucks + '</tr></thead><tbody>' + trs + '</tbody></table></div>' +
       directionsHtml;
 
     var headEl = currentPopup.el.querySelector(".popup-head");
@@ -2349,7 +2454,7 @@
         '<div class="num-field"><span>Disposal rate</span><span class="kv-value">$' + Number(s.costPerTon).toFixed(2) + '/ton</span></div>' +
         '<div class="num-field"><span>Turnaround at site</span><span class="kv-value">' + s.turnaroundMin + ' min</span></div>' +
         (s.serviceArea && s.serviceArea.radiusMi
-          ? '<div class="num-field"><span>Service area</span><span class="kv-value">≤' + s.serviceArea.radiusMi + ' mi</span></div>'
+          ? '<div class="num-field"><span>Service area</span><span class="kv-value">' + formatRadiusMi(s.serviceArea.radiusMi) + '</span></div>'
           : '');
       siteListEl.appendChild(card);
     });
@@ -2425,7 +2530,7 @@
   // ---------- sidebar: cost assumptions (read-only, from CONFIG) ----------
   function renderCostAssumptions() {
     document.getElementById("costAssumptions").innerHTML =
-      '<div class="num-field"><span>Transport cost</span><span class="kv-value">$' + CONFIG.costPerMile.toFixed(2) + '/mi</span></div>';
+      '<div class="num-field"><span>Transport cost</span><span class="kv-value">' + formatCostPerMile(CONFIG.costPerMile) + '</span></div>';
   }
 
   // ---------- controls ----------
