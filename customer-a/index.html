@@ -159,6 +159,24 @@
   }
   .select-row select:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
 
+  /* Return-address entry, directly below the "Cost the return trip to
+     depot too" checkbox — grayed out (not removed) while that checkbox is
+     checked, since it's overridden rather than irrelevant. */
+  .return-address-row { margin-top: 10px; transition: opacity .15s ease; }
+  .return-address-row label { display: block; font-size: 11.5px; color: var(--ink-2); margin-bottom: 5px; }
+  .return-address-input-row { display: flex; gap: 6px; }
+  .return-address-input-row input {
+    flex: 1; min-width: 0; font-family: var(--font-ui); border: 1px solid var(--border); background: var(--surface);
+    color: var(--ink); padding: 6px 8px; border-radius: 8px; font-size: 12.5px;
+  }
+  .return-address-input-row input:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+  .return-address-status { margin: 6px 0 0; }
+  .link-btn {
+    font-family: var(--font-ui); border: none; background: none; color: var(--teal-strong); font-size: 11.5px;
+    font-weight: 700; cursor: pointer; padding: 0; text-decoration: underline;
+  }
+  .return-address-row.disabled { opacity: 0.5; pointer-events: none; }
+
   .lob-row { padding: 8px 9px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); margin-bottom: 6px; font-size: 12.5px; }
   .lob-row .lob-name { font-weight: 700; display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
   .lob-swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; }
@@ -337,7 +355,18 @@
   .directions summary::-webkit-details-marker { display: none; }
   .directions summary .chev { display: inline-block; transition: transform .15s ease; color: var(--ink-3); }
   .directions[open] summary .chev { transform: rotate(90deg); }
-  .directions ol { margin: 8px 0 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
+  .directions summary .directions-title-text { flex: 1; min-width: 0; }
+  .directions-export-btn {
+    margin-left: auto; flex: none; text-decoration: none; border: 1px solid var(--border);
+    padding: 3px 8px; border-radius: 6px; background: var(--surface-2);
+  }
+  .directions-export-btn:hover { border-color: var(--teal); color: var(--teal-strong); }
+  .directions-leg-label {
+    font-size: 10.5px; font-weight: 800; color: var(--ink-3); text-transform: uppercase;
+    letter-spacing: 0.05em; margin: 10px 0 2px;
+  }
+  .directions-leg-label:first-of-type { margin-top: 8px; }
+  .directions ol { margin: 4px 0 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
   .direction-step { display: flex; gap: 8px; align-items: flex-start; padding: 6px 2px; border-top: 1px solid var(--border); font-size: 12px; }
   .direction-step:first-child { border-top: none; }
   .direction-icon { flex: none; width: 16px; text-align: center; font-weight: 700; color: var(--teal); }
@@ -430,7 +459,7 @@
     <aside class="sidebar" id="sidebar">
       <div class="panel">
         <h2>Depot</h2>
-        <p class="hint">Where trucks return to when the return trip is costed.</p>
+        <p class="hint">Where trucks return to when "Cost the return trip to depot too" is checked below. Otherwise the default return point is the clicked/searched location itself (or a manually entered return address).</p>
         <div id="depotInfo"></div>
       </div>
 
@@ -474,9 +503,17 @@
 
       <div class="panel">
         <h2>Cost assumptions <button type="button" class="info-toggle" data-info="info-cost" aria-expanded="false" aria-label="More info">i</button></h2>
-        <p class="info-box" id="info-cost" hidden>Every click sends a live request to the configured routing engine (OSRM, ORS, or Google) for real driving distance &amp; time from that point to all 5 sites. The popup lets you pick a line of business and a truck size independently — disposal cost scales with the truck's tonnage, while the max drive time cap comes from that specific line-of-business + truck-size combination (a 10 Ton Residential route and a 3 Ton Residential route can have different caps). If the cheapest site takes longer to drive to (one-way) than that combo's cap, its row is flagged instead of shown as optimal. Sites, lines of business, truck sizes and cost figures all come from the CONFIG block at the top of the script — edit the file to change those. Service area boundaries are drawn per site (any site can have none) purely as a visual reference — they don't affect which site is cheapest. Each boundary reflects whichever line-of-business + truck-size "basis" is picked above, fetched as a real road-routed isochrone (sampled drive time in a ring of directions around the site, not a straight-line radius); it shows as a plain circle first and upgrades once that fetch resolves, re-fetching whenever the basis changes, or staying a circle if the routing engine can't be reached. The return-trip, service-area, and basis controls above are the live controls, since they're things you'd flip case to case rather than reconfigure.</p>
+        <p class="info-box" id="info-cost" hidden>Every click sends a live request to the configured routing engine (OSRM, ORS, or Google) for real driving distance &amp; time from that point to all 5 sites. Every route is costed as a round trip — out to the site, then back to a return point — not just the outbound leg. By default that return point is the clicked/searched location itself; entering a return address below routes back there instead, and checking "Cost the return trip to depot too" overrides both and routes back to the depot. The popup lets you pick a line of business and a truck size independently — disposal cost scales with the truck's tonnage, while the max drive time cap comes from that specific line-of-business + truck-size combination (a 10 Ton Residential route and a 3 Ton Residential route can have different caps), checked against the full out-and-back drive time. If the cheapest site's round trip takes longer than that combo's cap, its row is flagged instead of shown as optimal. Sites, lines of business, truck sizes and cost figures all come from the CONFIG block at the top of the script — edit the file to change those. Service area boundaries are drawn per site (any site can have none) purely as a visual reference — they don't affect which site is cheapest. Each boundary reflects whichever line-of-business + truck-size "basis" is picked above, fetched as a real road-routed isochrone (sampled drive time in a ring of directions around the site, not a straight-line radius) using half the basis's max drive time (since that cap is a round-trip figure); it shows as a plain circle first and upgrades once that fetch resolves, re-fetching whenever the basis changes, or staying a circle if the routing engine can't be reached. The return-trip, service-area, and basis controls above are the live controls, since they're things you'd flip case to case rather than reconfigure.</p>
         <div id="costAssumptions"></div>
         <label class="check-row"><input type="checkbox" id="cfgRoundTrip"> Cost the return trip to depot too</label>
+        <div class="return-address-row" id="returnAddressRow">
+          <label for="returnAddressInput">Return point <span class="th-sub">defaults to the clicked/searched location; overridden by the depot checkbox above</span></label>
+          <div class="return-address-input-row">
+            <input type="text" id="returnAddressInput" placeholder="Enter a return address…" autocomplete="off" aria-label="Return address">
+            <button class="ghost" id="returnAddressSetBtn" type="button">Set</button>
+          </div>
+          <p class="hint return-address-status" id="returnAddressStatus"></p>
+        </div>
       </div>
     </aside>
 
@@ -721,7 +758,14 @@
     // area radiusMi, etc.) regardless of this setting -- it only controls
     // how distances are DISPLAYED. "mi" or "km".
     distanceUnit: "mi",
-    roundTrip: false,    // true = cost the real drive back to the depot too (starting value; toggle in the sidebar overrides this per session)
+    // Every route is now always costed as a round trip (out to the site,
+    // back to a return point) — this no longer toggles one-way vs.
+    // round-trip. true = start with the return point set to the depot
+    // (the "Cost the return trip to depot too" checkbox); false = start
+    // with the default return point (the clicked/searched location itself,
+    // or a manually entered return address if one's been set). Starting
+    // value only; the checkbox in the sidebar overrides this per session.
+    roundTrip: false,
 
     // Whether service-area boundaries are shown on load (starting value;
     // toggle in the sidebar overrides this per session).
@@ -774,7 +818,10 @@
   var depot = CONFIG.depot;
   var activeLobId = CONFIG.defaultLobId;
   var activeTruckId = CONFIG.defaultTruckId;
-  var roundTripActive = CONFIG.roundTrip;
+  // Whether the return leg of every round trip routes back to the depot
+  // (checkbox) instead of the default return point — see resolveReturnLeg/
+  // resolveReturnPoint below for the full priority order.
+  var returnToDepot = CONFIG.roundTrip;
   var serviceAreasVisible = CONFIG.showServiceAreas;
   // Which line-of-business + truck-size combo's max drive time governs the
   // map's service-area boundaries — independent of the popup's own
@@ -790,6 +837,15 @@
   var depotLegs = null;      // { siteId: {mi, min} }, filled once at startup
   var depotLegsLive = false;
 
+  // Manually entered return address (sidebar, below the depot checkbox).
+  // null until the user sets one; overridden by returnToDepot when that's
+  // checked. Legs are fetched once per address (batched, like depotLegs
+  // above), not per click.
+  var returnAddressPoint = null;  // { lat, lng, label } or null
+  var returnAddressLegs = null;   // { siteId: {mi, min} }
+  var returnAddressLegsLive = false;
+  var returnAddressSeq = 0;
+
   var siteListEl = document.getElementById("siteList");
   var lobListEl = document.getElementById("lobList");
   var truckListEl = document.getElementById("truckList");
@@ -799,6 +855,10 @@
   var searchInput = document.getElementById("addressSearch");
   var searchBtn = document.getElementById("addressSearchBtn");
   var suggestionsEl = document.getElementById("searchSuggestions");
+  var returnAddressInput = document.getElementById("returnAddressInput");
+  var returnAddressSetBtn = document.getElementById("returnAddressSetBtn");
+  var returnAddressStatusEl = document.getElementById("returnAddressStatus");
+  var returnAddressRow = document.getElementById("returnAddressRow");
 
   var currentPopup = null;
   var adhocMarker = null;
@@ -817,21 +877,18 @@
   }
 
   // ---------- cost model ----------
-  // "Drive time" below means driving only — the outbound leg to the site,
-  // plus (when the return trip is costed) the real routed leg from that
-  // site back to the depot. A line of business's max drive time caps that
-  // actual driving time, not time spent waiting to tip at the site.
-  // Tonnage comes from the truck, not the line of business — the two vary
-  // independently, so disposal cost depends on which truck is picked while
-  // labor rate and the max-drive-time cap depend on which line it's running.
-  function costForRoute(oneWayMi, oneWayMin, site, lob, truck, depotLeg) {
-    var billedDist = oneWayMi;
-    var driveTimeMin = oneWayMin;
-    if (roundTripActive) {
-      var leg = depotLeg || estimateDepotLeg(site);
-      billedDist += leg.mi;
-      driveTimeMin += leg.min;
-    }
+  // "Drive time" below is always a round trip now: the outbound leg to the
+  // site, plus the real routed leg from that site back to whichever return
+  // point is active (see resolveReturnLeg — the clicked/searched location
+  // by default, a manually entered return address, or the depot). A line
+  // of business's max drive time caps that total out-and-back driving
+  // time, not time spent waiting to tip at the site. Tonnage comes from
+  // the truck, not the line of business — the two vary independently, so
+  // disposal cost depends on which truck is picked while labor rate and
+  // the max-drive-time cap depend on which line it's running.
+  function costForRoute(oneWayMi, oneWayMin, site, lob, truck, returnLeg) {
+    var billedDist = oneWayMi + returnLeg.mi;
+    var driveTimeMin = oneWayMin + returnLeg.min;
     var timeMin = driveTimeMin + Number(site.turnaroundMin || 0);
     var disposalCost = (Number(site.costPerTon) || 0) * (Number(truck.tons) || 0);
     var transportCost = billedDist * (Number(CONFIG.costPerMile) || 0);
@@ -841,14 +898,44 @@
     return {
       disposalCost: disposalCost, transportCost: transportCost, laborCost: laborCost,
       total: disposalCost + transportCost + laborCost,
-      mi: billedDist, driveTimeMin: driveTimeMin, timeMin: timeMin, maxDriveTime: maxDriveTime, exceedsMaxDrive: exceedsMaxDrive
+      mi: billedDist, outMi: oneWayMi, returnMi: returnLeg.mi,
+      driveTimeMin: driveTimeMin, timeMin: timeMin, maxDriveTime: maxDriveTime, exceedsMaxDrive: exceedsMaxDrive
     };
   }
 
-  function estimateDepotLeg(site) {
-    var straight = haversineMiles(site.lat, site.lng, depot.lat, depot.lng);
+  // Which return point applies right now, and the site's leg back to it.
+  // This is the single place that decision is made — returnToDepot (the
+  // "Cost the return trip to depot too" checkbox) always wins; otherwise a
+  // manually entered return address; otherwise the clicked/searched point
+  // the popup itself is for (returnToClickLegs, fetched fresh per click
+  // since that point changes every time — see handleClick).
+  function resolveReturnLeg(site, returnToClickLegs) {
+    if (returnToDepot) {
+      return (depotLegs && depotLegs[site.id]) || estimateLegTo(site, depot);
+    }
+    if (returnAddressPoint) {
+      return (returnAddressLegs && returnAddressLegs[site.id]) || estimateLegTo(site, returnAddressPoint);
+    }
+    return (returnToClickLegs && returnToClickLegs[site.id]) ||
+      estimateLegTo(site, { lat: currentPopup.lat, lng: currentPopup.lng });
+  }
+
+  function estimateLegTo(site, point) {
+    var straight = haversineMiles(site.lat, site.lng, point.lat, point.lng);
     var factor = CONFIG.roadFactorFallback;
     return { mi: straight * factor, min: (straight * factor / 30) * 60 };
+  }
+  function estimateDepotLeg(site) { return estimateLegTo(site, depot); }
+
+  // The actual coordinates + label of the active return point, given the
+  // current click. Same priority as resolveReturnLeg above (depot, then a
+  // manual address, then the click itself) — used wherever the return
+  // point needs to be routed/drawn to, not just costed, so this is the one
+  // other place that priority is encoded.
+  function resolveReturnPoint(lat, lng) {
+    if (returnToDepot) return { lat: depot.lat, lng: depot.lng, label: depot.name };
+    if (returnAddressPoint) return { lat: returnAddressPoint.lat, lng: returnAddressPoint.lng, label: returnAddressPoint.label };
+    return { lat: lat, lng: lng, label: "the clicked location" };
   }
 
   // ---------- routing (provider-agnostic matrix + route-line fetchers) ----------
@@ -1152,16 +1239,26 @@
 
   // Site -> depot legs don't depend on where a click lands, so fetch them
   // once at startup (single table request) instead of on every click.
-  function fetchDepotLegs() {
-    var allCoords = sites.map(function (s) { return [s.lng, s.lat]; }).concat([[depot.lng, depot.lat]]);
+  // Shared by the depot legs and the manual return-address legs (and, per
+  // click, the default return-to-click legs): a single batched site ->
+  // point matrix request (one call for all sites), since none of these
+  // depend on where a map click lands except the click's own point.
+  function fetchLegsTo(point) {
+    var allCoords = sites.map(function (s) { return [s.lng, s.lat]; }).concat([[point.lng, point.lat]]);
     var sourceIndices = sites.map(function (_, i) { return i; });
-    var depotIdx = sites.length;
-    return fetchMatrix(allCoords, sourceIndices, [depotIdx]).then(function (data) {
+    var pointIdx = sites.length;
+    return fetchMatrix(allCoords, sourceIndices, [pointIdx]).then(function (data) {
       var out = {};
       sites.forEach(function (s, i) {
         var m = data.distances[i][0], sec = data.durations[i][0];
-        out[s.id] = (m == null || sec == null) ? estimateDepotLeg(s) : { mi: m / 1609.344, min: sec / 60 };
+        out[s.id] = (m == null || sec == null) ? estimateLegTo(s, point) : { mi: m / 1609.344, min: sec / 60 };
       });
+      return out;
+    });
+  }
+
+  function fetchDepotLegs() {
+    return fetchLegsTo(depot).then(function (out) {
       depotLegs = out;
       depotLegsLive = true;
     }).catch(function () {
@@ -1549,12 +1646,25 @@
     serviceAreaLayers.forEach(function (p) { map.removeLayer(p); });
     serviceAreaLayers = [];
   }
+  // Max drive time (getMaxDriveTime) is now a ROUND-TRIP cap (out to the
+  // site, back to the return point), since every route is costed that way.
+  // A service-area boundary, though, has always meant "how far out can you
+  // get" — a one-way distance — so it's drawn against HALF that cap, not
+  // the full round-trip figure (which would draw a circle roughly twice as
+  // large as what a truck can actually reach and still make it back within
+  // the cap).
+  function getOneWayIsochroneThreshold(lobId, truckId) {
+    var maxDriveTime = getMaxDriveTime(lobId, truckId);
+    return isFinite(maxDriveTime) ? maxDriveTime / 2 : maxDriveTime;
+  }
+
   function drawServiceAreas() {
     clearServiceAreas();
     if (!serviceAreasVisible) return;
     var areaLob = lobs.find(function (l) { return l.id === areaLobId; }) || lobs[0];
     var areaTruck = truckSizes.find(function (t) { return t.id === areaTruckId; }) || truckSizes[0];
-    var thresholdMin = getMaxDriveTime(areaLob.id, areaTruck.id);
+    var maxDriveTime = getMaxDriveTime(areaLob.id, areaTruck.id);
+    var thresholdMin = getOneWayIsochroneThreshold(areaLob.id, areaTruck.id);
     var basisLabel = escapeHtml(areaLob.label) + ' · ' + escapeHtml(areaTruck.label);
     sites.forEach(function (s) {
       if (!s.serviceArea) return;
@@ -1568,8 +1678,8 @@
       var tipText = !isFinite(thresholdMin)
         ? 'no max drive time set for ' + basisLabel
         : (isoPts
-            ? '~' + thresholdMin + ' min drive · ' + basisLabel + ' (live routed)'
-            : '~' + thresholdMin + ' min drive · ' + basisLabel + ' (estimated — routing unreachable)');
+            ? '~' + Math.round(thresholdMin) + ' min drive one-way (half of ' + maxDriveTime + 'm round-trip cap) · ' + basisLabel + ' (live routed)'
+            : '~' + Math.round(thresholdMin) + ' min drive one-way (half of ' + maxDriveTime + 'm round-trip cap) · ' + basisLabel + ' (estimated — routing unreachable)');
       poly.bindTooltip(
         escapeHtml(s.name.split("—")[0].trim()) + ' service area · ' + tipText,
         { sticky: true, direction: "top", className: "site-label-tip", opacity: 0.95 }
@@ -1598,7 +1708,7 @@
     isochronePolygons = {};
     drawServiceAreas();
     if (!serviceAreasVisible) return;
-    var thresholdMin = getMaxDriveTime(areaLobId, areaTruckId);
+    var thresholdMin = getOneWayIsochroneThreshold(areaLobId, areaTruckId);
     if (!isFinite(thresholdMin)) return;
     if (isMeteredProvider()) {
       updateMeteredAreaStatus("Showing simple radius circles — click \"Compute live service areas\" for real drive-time boundaries.");
@@ -1641,7 +1751,7 @@
     if (el) el.textContent = text;
   }
   function computeLiveServiceAreasMetered() {
-    var thresholdMin = getMaxDriveTime(areaLobId, areaTruckId);
+    var thresholdMin = getOneWayIsochroneThreshold(areaLobId, areaTruckId);
     if (!isFinite(thresholdMin)) { updateMeteredAreaStatus("No max drive time set for this basis — nothing to compute."); return; }
     var mySeq = ++areaRequestSeq;
     var btn = document.getElementById("meteredAreaComputeBtn");
@@ -1786,13 +1896,39 @@
       return { routes: estimateFallback(lat, lng), live: false, err: err.message || "network error" };
     });
 
-    Promise.all([clickLeg, depotLegsPromise]).then(function (results) {
+    // The return-to-click leg only needs its own fetch when the click point
+    // itself is the active return point (the default) — when the depot
+    // checkbox or a manual return address overrides it, fetching this too
+    // would just be an extra metered request for numbers that get thrown
+    // away, so it's skipped entirely in that case (matches resolveReturnLeg's
+    // own priority below). This is deliberately a SEPARATE matrix request
+    // from the outbound one above (site->click, many-to-one) rather than one
+    // combined full click<->sites matrix — fetchMatrixGoogle's batching only
+    // safely caps requests where one side of the matrix has a single point,
+    // which both of these separate one-to-many/many-to-one calls satisfy.
+    var needsClickReturn = !returnToDepot && !returnAddressPoint;
+    var returnToClickLeg = needsClickReturn
+      ? fetchLegsTo({ lat: lat, lng: lng }).then(function (out) {
+          return { legs: out, live: true };
+        }).catch(function () {
+          var out = {};
+          sites.forEach(function (s) { out[s.id] = estimateLegTo(s, { lat: lat, lng: lng }); });
+          return { legs: out, live: false };
+        })
+      : Promise.resolve({ legs: null, live: true });
+
+    var returnDepPromise = returnToDepot ? depotLegsPromise : Promise.resolve();
+
+    Promise.all([clickLeg, returnToClickLeg, returnDepPromise]).then(function (results) {
       if (myReq !== requestSeq) return;
       var click = results[0];
-      // Overall "live" also depends on the depot leg, but only when the
-      // return trip is actually being costed.
-      var live = click.live && (!roundTripActive || depotLegsLive);
-      var err = click.err || (roundTripActive && !depotLegsLive ? "depot return route unavailable" : null);
+      var retClick = results[1];
+      var returnLive = returnToDepot ? depotLegsLive : (returnAddressPoint ? returnAddressLegsLive : retClick.live);
+      var live = click.live && returnLive;
+      var err = click.err ||
+        (returnToDepot && !depotLegsLive ? "depot return route unavailable" :
+          (returnAddressPoint && !returnAddressLegsLive ? "return address route unavailable" :
+            (!retClick.live ? "return route unavailable" : null)));
       if (live) {
         connPill.className = "conn-pill";
         connPill.innerHTML = '<span class="dot"></span>Routing engine ready';
@@ -1800,7 +1936,7 @@
         connPill.className = "conn-pill offline";
         connPill.innerHTML = '<span class="dot"></span>Routing engine unreachable';
       }
-      renderPopupResults(lat, lng, click.routes, live, err);
+      renderPopupResults(lat, lng, click.routes, retClick.legs, live, err);
     });
   }
 
@@ -1938,32 +2074,115 @@
 
   searchBtn.addEventListener("click", runSearch);
 
-  // ---------- route line to the lowest-cost site ----------
-  // The /table endpoint used elsewhere only returns distance/duration, not
-  // the actual road geometry, so drawing the real street-by-street path
-  // needs a separate one-off /route request for just the winning leg
-  // (click point -> current best site) — fetched once per popup and
-  // re-fetched only when the best site actually changes (switching line of
-  // business or truck size often keeps the same winner, so this avoids
-  // hammering the routing server on every toggle).
+  // ---------- return address (sidebar, below the depot checkbox) ----------
+  // Reuses the same Nominatim geocode() helper as the map search box above,
+  // but just resolves to a single best match on submit — this field sets a
+  // fixed point the sidebar keeps around, not a place to fly the map to.
+  function renderReturnAddressStatus(overrideMsg) {
+    if (overrideMsg) { returnAddressStatusEl.textContent = overrideMsg; return; }
+    if (!returnAddressPoint) { returnAddressStatusEl.textContent = ""; return; }
+    var note = returnAddressLegs
+      ? (returnAddressLegsLive ? "Live routed return legs to " : "Estimated return legs (routing engine unreachable) to ")
+      : "Fetching return-leg distances to ";
+    returnAddressStatusEl.innerHTML = note + '<strong>' + escapeHtml(returnAddressPoint.label) + '</strong> ' +
+      '<button type="button" class="link-btn" id="returnAddressClearBtn">Clear</button>';
+    document.getElementById("returnAddressClearBtn").addEventListener("click", function () {
+      returnAddressInput.value = "";
+      setReturnAddressPoint(null);
+    });
+  }
+
+  // Fetches (or re-fetches) the site -> return-address legs whenever the
+  // user sets or clears a manual return address. point is null to clear.
+  var returnAddressLegsPromise = null;
+  function setReturnAddressPoint(point) {
+    var mySeq = ++returnAddressSeq;
+    returnAddressPoint = point;
+    returnAddressLegs = null;
+    returnAddressLegsLive = false;
+    if (!point) {
+      renderReturnAddressStatus();
+      if (currentPopup) paintPopupBody();
+      return;
+    }
+    renderReturnAddressStatus("Fetching return-leg distances…");
+    returnAddressLegsPromise = fetchLegsTo(point).then(function (out) {
+      if (mySeq !== returnAddressSeq) return;
+      returnAddressLegs = out;
+      returnAddressLegsLive = true;
+      renderReturnAddressStatus();
+      if (currentPopup) paintPopupBody();
+    }).catch(function () {
+      if (mySeq !== returnAddressSeq) return;
+      var out = {};
+      sites.forEach(function (s) { out[s.id] = estimateLegTo(s, point); });
+      returnAddressLegs = out;
+      returnAddressLegsLive = false;
+      renderReturnAddressStatus();
+      if (currentPopup) paintPopupBody();
+    });
+  }
+
+  function runReturnAddressGeocode() {
+    var q = returnAddressInput.value.trim();
+    if (!q) { setReturnAddressPoint(null); return; }
+    returnAddressSetBtn.disabled = true;
+    returnAddressSetBtn.textContent = "…";
+    geocode(q, 1).then(function (results) {
+      returnAddressSetBtn.disabled = false;
+      returnAddressSetBtn.textContent = "Set";
+      if (results && results.length) {
+        setReturnAddressPoint({ lat: Number(results[0].lat), lng: Number(results[0].lon), label: results[0].display_name });
+      } else {
+        renderReturnAddressStatus("No matches found for that address.");
+      }
+    }).catch(function () {
+      returnAddressSetBtn.disabled = false;
+      returnAddressSetBtn.textContent = "Set";
+      renderReturnAddressStatus("Address search unavailable — check your connection.");
+    });
+  }
+  returnAddressSetBtn.addEventListener("click", runReturnAddressGeocode);
+  returnAddressInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); runReturnAddressGeocode(); }
+  });
+
+  // ---------- route lines: out to the site, and back to the return point ----------
+  // The /table (matrix) endpoint used elsewhere only returns distance/
+  // duration, not the actual road geometry, so drawing the real street-by-
+  // street path needs separate one-off /route (or /directions) requests —
+  // one for the outbound leg (click point -> current best site), one for
+  // the return leg (site -> whichever return point is active). Both are
+  // fetched together, once per popup, and re-fetched only when the winning
+  // site or the return point actually changes (switching line of business
+  // or truck size often keeps the same winner, so this avoids hammering
+  // the routing server on every toggle).
   var routeToSiteLayer = null;
   var routeToSiteCasingLayer = null;
+  var returnRouteLayer = null;
+  var returnRouteCasingLayer = null;
   var routeToSiteKey = null;         // combo currently fetched or being fetched
-  var routeToSiteResolvedKey = null; // combo the line + steps below actually belong to (null while in flight or failed)
-  var routeToSiteFailedKey = null;   // combo whose fetch definitively failed — distinct from "still in flight"
-  var routeToSiteSteps = null;       // [{icon, text, distText}], for the resolved combo
+  var routeToSiteResolvedKey = null; // combo the lines + steps below actually belong to (null while in flight or failed)
+  var routeToSiteFailedKey = null;   // combo whose fetch definitively failed (BOTH legs) — distinct from "still in flight"
+  var routeToSiteSteps = null;       // [{icon, text, distText}], outbound leg
+  var returnRouteSteps = null;       // [{icon, text, distText}], return leg
   var routeToSiteSeq = 0;
 
-  function routeKeyFor(lat, lng, site) {
-    return lat.toFixed(5) + "," + lng.toFixed(5) + "," + site.id;
+  function routeKeyFor(lat, lng, site, returnPoint) {
+    return lat.toFixed(5) + "," + lng.toFixed(5) + "," + site.id + "," +
+      returnPoint.lat.toFixed(5) + "," + returnPoint.lng.toFixed(5);
   }
 
   function clearRouteToSite() {
     if (routeToSiteLayer) { map.removeLayer(routeToSiteLayer); routeToSiteLayer = null; }
     if (routeToSiteCasingLayer) { map.removeLayer(routeToSiteCasingLayer); routeToSiteCasingLayer = null; }
+    if (returnRouteLayer) { map.removeLayer(returnRouteLayer); returnRouteLayer = null; }
+    if (returnRouteCasingLayer) { map.removeLayer(returnRouteCasingLayer); returnRouteCasingLayer = null; }
     routeToSiteKey = null;
     routeToSiteResolvedKey = null;
+    routeToSiteFailedKey = null;
     routeToSiteSteps = null;
+    returnRouteSteps = null;
   }
 
   // Turn-by-turn direction icons/text, built from OSRM's structured
@@ -2042,6 +2261,11 @@
     var m = step.maneuver || {};
     return STEP_ICONS[m.type] || STEP_ICONS[m.modifier] || "↑";
   }
+  function renderStepLi(s) {
+    return '<li class="direction-step"><span class="direction-icon">' + s.icon + '</span>' +
+      '<span class="direction-text">' + escapeHtml(s.text) + '</span>' +
+      '<span class="direction-dist">' + s.distText + '</span></li>';
+  }
 
   // Both providers return real road-following geometry for a single
   // origin->destination pair, just in very different shapes (OSRM: GeoJSON
@@ -2050,13 +2274,19 @@
   // properties.segments[].steps[] that already include a ready-made
   // English instruction string). Both fetchers below normalize down to
   // the same { coordinates: [[lat,lng],...], steps: [{icon,text,distText}] }
-  // shape, so drawRouteToSite() itself doesn't need to know which
+  // shape, so drawRoutesToSiteAndBack() itself doesn't need to know which
   // provider answered.
 
   function fetchRouteLine(fromLngLat, toLngLat) {
     if (CONFIG.routingProvider === "ors") return fetchRouteLineORS(fromLngLat, toLngLat);
     if (CONFIG.routingProvider === "google") return fetchRouteLineGoogle(fromLngLat, toLngLat);
     return fetchRouteLineOSRM(fromLngLat, toLngLat);
+  }
+  // Same, but resolves to null on failure instead of rejecting — so one leg
+  // failing (e.g. the return route) doesn't wipe out the other leg's
+  // already-successful line and directions.
+  function fetchRouteLineSafe(fromLngLat, toLngLat) {
+    return fetchRouteLine(fromLngLat, toLngLat).catch(function () { return null; });
   }
 
   function fetchRouteLineOSRM(fromLngLat, toLngLat) {
@@ -2205,42 +2435,70 @@
     });
   }
 
-  function drawRouteToSite(lat, lng, site) {
-    var key = routeKeyFor(lat, lng, site);
+  function drawRoutesToSiteAndBack(lat, lng, site) {
+    var returnPoint = resolveReturnPoint(lat, lng);
+    var key = routeKeyFor(lat, lng, site, returnPoint);
     if (key === routeToSiteKey) return;
     routeToSiteKey = key;
     routeToSiteResolvedKey = null;
     routeToSiteFailedKey = null;
     routeToSiteSteps = null;
+    returnRouteSteps = null;
     var mySeq = ++routeToSiteSeq;
-    fetchRouteLine([lng, lat], [site.lng, site.lat]).then(function (result) {
+    var color = (site.serviceArea && site.serviceArea.color) || "#0f6e63";
+
+    Promise.all([
+      fetchRouteLineSafe([lng, lat], [site.lng, site.lat]),
+      fetchRouteLineSafe([site.lng, site.lat], [returnPoint.lng, returnPoint.lat])
+    ]).then(function (legs) {
       if (mySeq !== routeToSiteSeq) return; // a newer popup/selection superseded this
-      var coords = result.coordinates;
-      if (routeToSiteLayer) map.removeLayer(routeToSiteLayer);
-      if (routeToSiteCasingLayer) map.removeLayer(routeToSiteCasingLayer);
-      var color = (site.serviceArea && site.serviceArea.color) || "#0f6e63";
+      var outLeg = legs[0], retLeg = legs[1];
+
+      if (routeToSiteLayer) { map.removeLayer(routeToSiteLayer); routeToSiteLayer = null; }
+      if (routeToSiteCasingLayer) { map.removeLayer(routeToSiteCasingLayer); routeToSiteCasingLayer = null; }
+      if (returnRouteLayer) { map.removeLayer(returnRouteLayer); returnRouteLayer = null; }
+      if (returnRouteCasingLayer) { map.removeLayer(returnRouteCasingLayer); returnRouteCasingLayer = null; }
+
       // A wide white "casing" drawn first, under a narrower colored line on
       // top — standard route-line styling so it reads clearly over both
       // basemaps and doesn't blend into a same-colored service-area fill.
-      routeToSiteCasingLayer = L.polyline(coords, {
-        color: "#ffffff", weight: 11, opacity: 0.9, lineCap: "round", lineJoin: "round"
-      }).addTo(map);
-      routeToSiteLayer = L.polyline(coords, {
-        color: color, weight: 4, opacity: 0.95, lineCap: "round", lineJoin: "round"
-      }).addTo(map);
-      routeToSiteSteps = result.steps;
-      routeToSiteResolvedKey = key;
+      // The return leg is drawn dashed and a touch thinner so the two
+      // directions are visually distinguishable where they overlap.
+      if (outLeg) {
+        routeToSiteCasingLayer = L.polyline(outLeg.coordinates, {
+          color: "#ffffff", weight: 11, opacity: 0.9, lineCap: "round", lineJoin: "round"
+        }).addTo(map);
+        routeToSiteLayer = L.polyline(outLeg.coordinates, {
+          color: color, weight: 4, opacity: 0.95, lineCap: "round", lineJoin: "round"
+        }).addTo(map);
+        routeToSiteSteps = outLeg.steps;
+      }
+      if (retLeg) {
+        returnRouteCasingLayer = L.polyline(retLeg.coordinates, {
+          color: "#ffffff", weight: 9, opacity: 0.85, lineCap: "round", lineJoin: "round"
+        }).addTo(map);
+        returnRouteLayer = L.polyline(retLeg.coordinates, {
+          color: color, weight: 3.5, opacity: 0.9, lineCap: "round", lineJoin: "round", dashArray: "1 10"
+        }).addTo(map);
+        returnRouteSteps = retLeg.steps;
+      }
+
+      if (!outLeg && !retLeg) {
+        // Leave no lines/steps rather than wrong ones — the cost table
+        // above still stands regardless of whether the road geometry could
+        // be fetched. Mark this key as definitively FAILED (not just "still
+        // in flight") so paintPopupBody() can stop showing "Fetching…"
+        // forever — without this, re-painting after this very call
+        // re-triggers the same dead-end "fetching" branch, since
+        // routeToSiteKey never clears.
+        routeToSiteFailedKey = key;
+      } else {
+        // Mark this combo resolved even if one leg failed — the cost table
+        // above stands regardless, and whichever leg's directions DID come
+        // back should still render instead of stalling on "fetching…".
+        routeToSiteResolvedKey = key;
+      }
       if (currentPopup) paintPopupBody();
-    }).catch(function () {
-      if (mySeq !== routeToSiteSeq) return;
-      // Leave no line/steps rather than wrong ones — the cost table above
-      // still stands regardless of whether the road geometry could be
-      // fetched. Mark this key as definitively FAILED (not just "still in
-      // flight") so paintPopupBody() can stop showing "Fetching…" forever —
-      // without this, re-painting after this very call re-triggers the
-      // same dead-end "fetching" branch, since routeToSiteKey never clears.
-      routeToSiteFailedKey = key;
-      if (currentPopup) paintPopupBody(); // clears any "fetching…" placeholder below
     });
   }
 
@@ -2259,12 +2517,13 @@
     positionPopup(card, containerPoint.x, containerPoint.y);
     card.querySelector(".popup-close").addEventListener("click", closePopup);
     initPopupDrag(card);
-    currentPopup = { el: card, lat: lat, lng: lng, x: containerPoint.x, y: containerPoint.y, routes: null, live: false, err: null };
+    currentPopup = { el: card, lat: lat, lng: lng, x: containerPoint.x, y: containerPoint.y, routes: null, returnToClick: null, live: false, err: null };
   }
 
-  function renderPopupResults(lat, lng, routes, live, err) {
+  function renderPopupResults(lat, lng, routes, returnToClick, live, err) {
     if (!currentPopup) return;
     currentPopup.routes = routes;
+    currentPopup.returnToClick = returnToClick;
     currentPopup.live = live;
     currentPopup.err = err;
     paintPopupBody();
@@ -2290,15 +2549,25 @@
       return '<button type="button" data-truck="' + t.id + '" class="' + (t.id === activeTruckId ? "active" : "") + '">' + escapeHtml(t.label) + '</button>';
     }).join("");
 
+    // Return point for this popup: the depot (if that checkbox is on), a
+    // manually entered return address, or -- the default -- the clicked/
+    // searched point this very popup is for. See resolveReturnLeg() (for
+    // costing) and resolveReturnPoint() (for the actual coordinates, used
+    // to route/draw/export the return leg below).
+    var returnPoint = resolveReturnPoint(lat, lng);
+    var returnLabel = returnToDepot ? returnPoint.label : (returnAddressPoint ? returnPoint.label.split(",")[0] : returnPoint.label);
+
     // Cost for every site x truck-size combo, all under the currently
-    // selected line of business (which sets labor rate + max drive cap).
+    // selected line of business (which sets labor rate + max drive cap) --
+    // and now always a round trip out to the site and back to returnLabel.
     var rows = sites.map(function (s) {
       var r = routes[s.id];
+      var returnLeg = r ? resolveReturnLeg(s, currentPopup.returnToClick) : null;
       var perTruck = {};
       truckSizes.forEach(function (t) {
-        perTruck[t.id] = r ? costForRoute(r.mi, r.min, s, activeLob, t, depotLegs ? depotLegs[s.id] : null) : null;
+        perTruck[t.id] = r ? costForRoute(r.mi, r.min, s, activeLob, t, returnLeg) : null;
       });
-      return { site: s, r: r, perTruck: perTruck };
+      return { site: s, r: r, returnLeg: returnLeg, perTruck: perTruck };
     });
 
     rows.sort(function (a, b) {
@@ -2308,17 +2577,25 @@
     });
 
     var directionsHtml = "";
+    var bestSiteForDirections = null;
     if (rows[0] && rows[0].r) {
-      drawRouteToSite(lat, lng, rows[0].site);
-      var bestKey = routeKeyFor(lat, lng, rows[0].site);
-      if (bestKey === routeToSiteResolvedKey && routeToSiteSteps) {
-        directionsHtml = '<details class="directions"><summary><span class="chev">▸</span>Turn-by-turn directions to ' +
-          escapeHtml(rows[0].site.name.split("—")[0].trim()) + ' (' + routeToSiteSteps.length + ' steps)</summary><ol>' +
-          routeToSiteSteps.map(function (s) {
-            return '<li class="direction-step"><span class="direction-icon">' + s.icon + '</span>' +
-              '<span class="direction-text">' + escapeHtml(s.text) + '</span>' +
-              '<span class="direction-dist">' + s.distText + '</span></li>';
-          }).join("") + '</ol></details>';
+      bestSiteForDirections = rows[0].site;
+      drawRoutesToSiteAndBack(lat, lng, rows[0].site);
+      var bestKey = routeKeyFor(lat, lng, rows[0].site, returnPoint);
+      if (bestKey === routeToSiteResolvedKey && (routeToSiteSteps || returnRouteSteps)) {
+        var bestSiteShortName = rows[0].site.name.split("—")[0].trim();
+        var stepCount = (routeToSiteSteps ? routeToSiteSteps.length : 0) + (returnRouteSteps ? returnRouteSteps.length : 0);
+        var outSection = routeToSiteSteps
+          ? '<p class="directions-leg-label">Out — to ' + escapeHtml(bestSiteShortName) + '</p><ol>' + routeToSiteSteps.map(renderStepLi).join("") + '</ol>'
+          : '<p class="hint" style="margin:8px 0 0;">Outbound directions unavailable.</p>';
+        var retSection = returnRouteSteps
+          ? '<p class="directions-leg-label">Return — to ' + escapeHtml(returnLabel) + '</p><ol>' + returnRouteSteps.map(renderStepLi).join("") + '</ol>'
+          : '<p class="hint" style="margin:8px 0 0;">Return directions unavailable.</p>';
+        directionsHtml = '<details class="directions"><summary>' +
+          '<span class="chev">▸</span>' +
+          '<span class="directions-title-text">Turn-by-turn directions (' + stepCount + ' steps)</span>' +
+          '<button type="button" class="link-btn directions-export-btn" id="exportDirectionsBtn">Export</button>' +
+          '</summary>' + outSection + retSection + '</details>';
       } else if (bestKey === routeToSiteFailedKey) {
         directionsHtml = '<p class="hint" style="margin:10px 0 0;">Couldn\u2019t fetch turn-by-turn directions for this route \u2014 the cost/distance numbers above are still live and correct.</p>';
       } else if (bestKey === routeToSiteKey) {
@@ -2349,13 +2626,15 @@
             ? '<span class="badge-warn">Exceeds ' + escapeHtml(activeLob.shortLabel) + ' + ' + escapeHtml(activeTruck.label) + '’s max time</span>'
             : '<span class="badge-best">Optimal for ' + escapeHtml(activeLob.label) + ' · ' + escapeHtml(activeTruck.label) + '</span>')
         : '';
+      var miTitle = "Out: " + formatDistanceMi(r.mi) + " to " + escapeHtml(s.name.split("—")[0].trim()) +
+        " / Return: " + formatDistanceMi(row.returnLeg.mi) + " to " + escapeHtml(returnLabel);
       // Both driveTimeMin and mi are the same across truck sizes for a
-      // given site (they only depend on the route + the global round-trip
-      // setting, not tonnage), so any truck's entry shows the figures the
-      // max-drive-time cells compare against.
+      // given site (they only depend on the route + the active return
+      // point, not tonnage), so any truck's entry shows the round-trip
+      // figures the max-drive-time cells compare against.
       return '<tr class="' + rowClass + '">' +
         '<td class="site-name">' + escapeHtml(s.name.split("—")[0].trim()) + badgeHtml + '</td>' +
-        '<td>' + (CONFIG.distanceUnit === "km" ? (topCost.mi * KM_PER_MI).toFixed(1) : topCost.mi.toFixed(1)) + '</td>' +
+        '<td title="' + miTitle + '">' + (CONFIG.distanceUnit === "km" ? (topCost.mi * KM_PER_MI).toFixed(1) : topCost.mi.toFixed(1)) + '</td>' +
         '<td>' + Math.round(topCost.driveTimeMin) + '</td>' +
         tds +
         '</tr>';
@@ -2366,8 +2645,9 @@
       badge + errHtml +
       '<div class="size-seg" id="lobSeg">' + lobSeg + '</div>' +
       '<div class="size-seg" id="truckSeg">' + truckSeg + '</div>' +
-      '<p class="hint" style="margin:0 0 4px; font-size:11px;">Max drive time depends on both line of business and truck size — see the cap under each column below. The solid line on the map traces the real driving route to the lowest-cost site below.</p>' +
-      '<div class="table-scroll"><table class="results"><thead><tr><th>Site</th><th>' + distanceUnitLabel() + '</th><th>Min</th>' + thTrucks + '</tr></thead><tbody>' + trs + '</tbody></table></div>' +
+      '<p class="hint" style="margin:0 0 4px; font-size:11px;">Every route is a round trip — out to the site, then back to ' + escapeHtml(returnLabel) +
+        '. Max drive time depends on both line of business and truck size and is checked against that full out-and-back time — see the cap under each column below. The solid line on the map traces the real driving route to the lowest-cost site below; the dashed line traces the return leg back.</p>' +
+      '<div class="table-scroll"><table class="results"><thead><tr><th>Site</th><th>' + distanceUnitLabel() + '<span class="th-sub">round trip</span></th><th>Min<span class="th-sub">round trip</span></th>' + thTrucks + '</tr></thead><tbody>' + trs + '</tbody></table></div>' +
       directionsHtml;
 
     var headEl = currentPopup.el.querySelector(".popup-head");
@@ -2387,6 +2667,61 @@
         renderTruckList(); // keep the sidebar's own selection in sync
       });
     });
+
+    var exportBtn = currentPopup.el.querySelector("#exportDirectionsBtn");
+    if (exportBtn && bestSiteForDirections) {
+      exportBtn.addEventListener("click", function (e) {
+        // Stop the click from bubbling to <summary>, which would otherwise
+        // toggle the <details> open/closed as its native side effect of any
+        // click landing inside it.
+        e.stopPropagation();
+        e.preventDefault();
+        exportDirections(lat, lng, bestSiteForDirections, returnPoint, returnLabel);
+      });
+    }
+  }
+
+  // ---------- export turn-by-turn directions ----------
+  function slugify(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "directions";
+  }
+  function formatStepsAsText(steps) {
+    if (!steps || !steps.length) return "  (directions unavailable)";
+    return steps.map(function (s, i) {
+      return "  " + (i + 1) + ". " + s.text + (s.distText ? "  (" + s.distText + ")" : "");
+    }).join("\n");
+  }
+  // Downloads a plain-text file with both legs' turn-by-turn directions —
+  // whatever's currently drawn on the map for the lowest-cost site, so this
+  // always matches what the popup is showing at the moment of export.
+  function exportDirections(lat, lng, site, returnPoint, returnLabel) {
+    var siteName = site.name.split("—")[0].trim();
+    var now = new Date();
+    var lines = [];
+    lines.push("HAUL ROUTER — TURN-BY-TURN DIRECTIONS");
+    lines.push("Generated " + now.toLocaleString());
+    lines.push("");
+    lines.push("Pickup point: " + lat.toFixed(5) + ", " + lng.toFixed(5));
+    lines.push("Site: " + siteName + " (" + site.lat.toFixed(5) + ", " + site.lng.toFixed(5) + ")");
+    lines.push("Return point: " + returnLabel + " (" + returnPoint.lat.toFixed(5) + ", " + returnPoint.lng.toFixed(5) + ")");
+    lines.push("");
+    lines.push("---- OUT: pickup point -> " + siteName + " ----");
+    lines.push(formatStepsAsText(routeToSiteSteps));
+    lines.push("");
+    lines.push("---- RETURN: " + siteName + " -> " + returnLabel + " ----");
+    lines.push(formatStepsAsText(returnRouteSteps));
+    lines.push("");
+    var text = lines.join("\n");
+    var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "directions-" + slugify(siteName) + "-" +
+      now.toISOString().slice(0, 16).replace(/[:T]/g, "-") + ".txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
   function escapeHtml(s) {
@@ -2586,9 +2921,11 @@
   });
 
   var roundTripCheckbox = document.getElementById("cfgRoundTrip");
-  roundTripCheckbox.checked = roundTripActive;
+  roundTripCheckbox.checked = returnToDepot;
+  returnAddressRow.classList.toggle("disabled", returnToDepot);
   roundTripCheckbox.addEventListener("change", function (e) {
-    roundTripActive = e.target.checked;
+    returnToDepot = e.target.checked;
+    returnAddressRow.classList.toggle("disabled", returnToDepot);
     if (currentPopup) paintPopupBody();
   });
 
