@@ -739,7 +739,7 @@
     // PER TRUCK SIZE (see truckSizes above, each entry's googleVehicle),
     // not here, since a 3 Ton and a 10 Ton rig need different values.
     googleApiKey: "",
-    googleBaseUrl: "http://localhost:8765/proxy/google",   // via local_server_with_proxy.py — see the CORS note on orsBaseUrl above; the same real-server CORS block is likely here too, unconfirmed either way
+    googleBaseUrl: "https://disposalop.onrender.com/proxy/google",   // via local_server_with_proxy.py — see the CORS note on orsBaseUrl above; the same real-server CORS block is likely here too, unconfirmed either way
     googleVehicleTrailerLength: null,     // meters, optional — applies regardless of truck size
     googleVehicleHazardousGoodsTypes: [], // e.g. ["FLAMMABLE"] — optional, see Google's docs for valid values
     // Milliseconds between each Google request when several are needed in
